@@ -13,15 +13,17 @@ namespace EFCoreDeadlockRetryBug
         static async Task Main(string[] args)
         {
             ServiceCollection services = new ServiceCollection();
-            services.AddDbContext<DemoContext>(options => options.UseSqlServer("Server=localhost\\SQLEXPRESS;Database=testEFCoreDeadlockRetryBug;Trusted_Connection=True;", o => o.EnableRetryOnFailure()));
+            //services.AddDbContext<DemoContext>(options => options.UseSqlServer("Server=localhost\\SQLEXPRESS;Database=testEFCoreDeadlockRetryBug;Trusted_Connection=True;", o => o.EnableRetryOnFailure()));
+            services.AddDbContext<DemoContext>(options => options.UseSqlServer("Server=localhost\\SQLEXPRESS;Database=testEFCoreDeadlockRetryBug;Trusted_Connection=True;"));
             ServiceProvider provider = services.BuildServiceProvider();
 
             await InitializeDb(provider);
-
+            var endlessTask1 = ChangeParents(provider);
+            await NumberOfChildren(provider);
         }
 
 
-        static private async Task InitializeDb(ServiceProvider provider)
+        private static async Task InitializeDb(ServiceProvider provider)
         {
             using (IServiceScope scope = provider.CreateScope())
             {
@@ -45,15 +47,52 @@ namespace EFCoreDeadlockRetryBug
             }
         }
 
-        private async Task ChangeParents()
+        private static async Task ChangeParents(ServiceProvider provider)
         {
-
             while (true)
             {
                 using (IServiceScope scope = provider.CreateScope())
                 {
-                    //Create a new parent and move the children to this parent
-                    demoContext.Parents.Add(new Parent());
+                    DemoContext demoContext = scope.ServiceProvider.GetRequiredService<DemoContext>();
+
+                    //Create a new parent and delete the old one
+                    var newParent = new Parent();
+                    var oldParent = (await demoContext.Children.Include(c => c.Parent).FirstAsync()).Parent;
+                    demoContext.Parents.Add(newParent);
+                    demoContext.Parents.Remove(oldParent);
+
+                    //assign the new parent to the children
+                    await demoContext.Children.ForEachAsync(child => child.Parent = newParent);
+
+                    //save
+                    await demoContext.SaveChangesAsync();
+                }
+            }
+        }
+
+        private static async Task NumberOfChildren(ServiceProvider provider)
+        {
+            while (true)
+            {
+                var numberOfChildren = 0;
+
+                using (IServiceScope scope = provider.CreateScope())
+                {
+                    DemoContext demoContext = scope.ServiceProvider.GetRequiredService<DemoContext>();
+
+                    //Count the children
+                    var parentWithChildren = await demoContext.Parents
+                        .Include(p => p.Children)
+                        .FirstAsync();
+
+                    numberOfChildren = parentWithChildren.Children.Count();
+                }
+
+                Console.WriteLine(numberOfChildren);
+
+                if (numberOfChildren != 6)
+                {
+                    return;
                 }
             }
         }
