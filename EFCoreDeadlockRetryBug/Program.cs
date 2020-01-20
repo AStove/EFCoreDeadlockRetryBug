@@ -13,8 +13,8 @@ namespace EFCoreDeadlockRetryBug
         static async Task Main(string[] args)
         {
             ServiceCollection services = new ServiceCollection();
-            //services.AddDbContext<DemoContext>(options => options.UseSqlServer("Server=localhost\\SQLEXPRESS;Database=testEFCoreDeadlockRetryBug;Trusted_Connection=True;", o => o.EnableRetryOnFailure()));
-            services.AddDbContext<DemoContext>(options => options.UseSqlServer("Server=localhost\\SQLEXPRESS;Database=testEFCoreDeadlockRetryBug;Trusted_Connection=True;"));
+            services.AddDbContext<DemoContext>(options => options.UseSqlServer("Server=localhost\\SQLEXPRESS;Database=testEFCoreDeadlockRetryBug;Trusted_Connection=True;", o => o.EnableRetryOnFailure()));
+            //services.AddDbContext<DemoContext>(options => options.UseSqlServer("Server=localhost\\SQLEXPRESS;Database=testEFCoreDeadlockRetryBug;Trusted_Connection=True;"));
             ServiceProvider provider = services.BuildServiceProvider();
 
             await InitializeDb(provider);
@@ -81,9 +81,10 @@ namespace EFCoreDeadlockRetryBug
                     DemoContext demoContext = scope.ServiceProvider.GetRequiredService<DemoContext>();
 
                     //Count the children
-                    var parentWithChildren = await demoContext.Parents
-                        .Include(p => p.Children)
-                        .FirstAsync();
+                    var parentWithChildren = (await demoContext.Children
+                        .Include(c => c.Parent)
+                        .Where(c => c.Parent.Id > 0)
+                        .ToListAsync()).First().Parent;
 
                     numberOfChildren = parentWithChildren.Children.Count();
                 }
