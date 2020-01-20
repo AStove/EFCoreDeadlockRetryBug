@@ -10,5 +10,6 @@ namespace EFCoreDeadlockRetryBug
         [Key]
         public int Id { get; set; }
         public List<Child> Children { get; set; }
+        public string HairColor { get; set; }
     }
 }

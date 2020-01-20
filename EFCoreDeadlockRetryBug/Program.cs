@@ -19,6 +19,7 @@ namespace EFCoreDeadlockRetryBug
 
             await InitializeDb(provider);
             var endlessTask1 = ChangeParents(provider);
+            
             await NumberOfChildren(provider);
         }
 
@@ -34,7 +35,7 @@ namespace EFCoreDeadlockRetryBug
                 demoContext.Children.RemoveRange(demoContext.Children.ToArray());
 
                 //Create parent with a number of children
-                var ParentWithChildren = new Parent();
+                var ParentWithChildren = new Parent { HairColor = "brown" };
                 demoContext.Parents.Add(ParentWithChildren);
 
                 for (int i = 0; i <= 5; i++)
@@ -56,7 +57,7 @@ namespace EFCoreDeadlockRetryBug
                     DemoContext demoContext = scope.ServiceProvider.GetRequiredService<DemoContext>();
 
                     //Create a new parent and delete the old one
-                    var newParent = new Parent();
+                    var newParent = new Parent { HairColor = "brown" };
                     var oldParent = (await demoContext.Children.Include(c => c.Parent).FirstAsync()).Parent;
                     demoContext.Parents.Add(newParent);
                     demoContext.Parents.Remove(oldParent);
@@ -81,20 +82,20 @@ namespace EFCoreDeadlockRetryBug
                     DemoContext demoContext = scope.ServiceProvider.GetRequiredService<DemoContext>();
 
                     //Count the children
-                    var parentWithChildren = (await demoContext.Children
-                        .Include(c => c.Parent)
-                        .Where(c => c.Parent.Id > 0)
-                        .ToListAsync()).First().Parent;
+                    var parentsWithChildren = await demoContext.Parents
+                        .Include(p => p.Children)
+                        .Where(p => p.HairColor == "brown")
+                        .ToListAsync();
 
-                    numberOfChildren = parentWithChildren.Children.Count();
+                    numberOfChildren = parentsWithChildren.First().Children.Count();
                 }
 
                 Console.WriteLine(numberOfChildren);
 
-                if (numberOfChildren != 6)
-                {
-                    return;
-                }
+                //if (numberOfChildren != 6)
+                //{
+                //    return;
+                //}
             }
         }
     }
